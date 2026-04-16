@@ -59,7 +59,10 @@ class Config:
     # Face quality gates
     MIN_FACE_CONFIDENCE: float = 0.60   # InsightFace det_score
     MIN_FACE_SIZE_PX: int = 60          # shorter side of bounding box
-    BLUR_LAPLACIAN_THRESHOLD: float = 60.0  # lower = blurrier
+    # IDs are often photos of printed cards with low texture, so they need a
+    # lower blur gate than live selfies.
+    ID_BLUR_LAPLACIAN_THRESHOLD: float = 25.0
+    SELFIE_BLUR_LAPLACIAN_THRESHOLD: float = 60.0
 
     # Aggregation
     USE_WEIGHTED_AGGREGATION: bool = True
@@ -197,7 +200,7 @@ def _laplacian_variance(gray: np.ndarray) -> float:
 def _face_box_size(face) -> int:
     """Shorter side of the detected bounding box in pixels."""
     x1, y1, x2, y2 = face.bbox.astype(int)
-    return min(abs(x2 - x1), abs(y2 - y1))
+    return int(min(abs(x2 - x1), abs(y2 - y1)))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -220,18 +223,6 @@ def _extract_face_sync(image: np.ndarray, label: str, allow_multi: bool = False)
     allow_multi=False  → rejects images with >1 face (strict KYC mode).
     allow_multi=True   → picks highest-confidence face with a warning.
     """
-    gray  = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    blur  = _laplacian_variance(gray)
-
-    if blur < Config.BLUR_LAPLACIAN_THRESHOLD:
-        return FaceResult(
-            embedding=np.zeros(1),
-            det_score=0.0,
-            accepted=False,
-            rejection_reason=RejectionReason.BLURRY,
-            blur_score=round(blur, 2),
-        )
-
     faces = app_state.face_analyzer.get(image)
 
     if not faces:
@@ -240,7 +231,7 @@ def _extract_face_sync(image: np.ndarray, label: str, allow_multi: bool = False)
             det_score=0.0,
             accepted=False,
             rejection_reason=RejectionReason.NO_FACE,
-            blur_score=round(blur, 2),
+            blur_score=None,
         )
 
     if len(faces) > 1 and not allow_multi:
@@ -249,7 +240,7 @@ def _extract_face_sync(image: np.ndarray, label: str, allow_multi: bool = False)
             det_score=0.0,
             accepted=False,
             rejection_reason=RejectionReason.MULTIPLE_FACES,
-            blur_score=round(blur, 2),
+            blur_score=None,
         )
 
     best = max(faces, key=lambda f: f.det_score)
@@ -260,7 +251,7 @@ def _extract_face_sync(image: np.ndarray, label: str, allow_multi: bool = False)
             det_score=float(best.det_score),
             accepted=False,
             rejection_reason=RejectionReason.LOW_CONFIDENCE,
-            blur_score=round(blur, 2),
+            blur_score=None,
         )
 
     size = _face_box_size(best)
@@ -270,8 +261,36 @@ def _extract_face_sync(image: np.ndarray, label: str, allow_multi: bool = False)
             det_score=float(best.det_score),
             accepted=False,
             rejection_reason=RejectionReason.FACE_TOO_SMALL,
+            blur_score=None,
+            face_size_px=int(size),
+        )
+
+    # Blur on the detected face crop is more reliable than full-frame blur.
+    h, w = image.shape[:2]
+    x1, y1, x2, y2 = best.bbox.astype(int)
+    x1 = max(0, min(x1, w - 1))
+    x2 = max(0, min(x2, w))
+    y1 = max(0, min(y1, h - 1))
+    y2 = max(0, min(y2, h))
+
+    face_crop = image[y1:y2, x1:x2]
+    if face_crop.size == 0:
+        face_crop = image
+
+    blur = _laplacian_variance(cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY))
+    blur_threshold = (
+        Config.ID_BLUR_LAPLACIAN_THRESHOLD
+        if label == "id_image"
+        else Config.SELFIE_BLUR_LAPLACIAN_THRESHOLD
+    )
+    if blur < blur_threshold:
+        return FaceResult(
+            embedding=np.zeros(1),
+            det_score=float(best.det_score),
+            accepted=False,
+            rejection_reason=RejectionReason.BLURRY,
             blur_score=round(blur, 2),
-            face_size_px=size,
+            face_size_px=int(size),
         )
 
     if len(faces) > 1:
@@ -282,7 +301,7 @@ def _extract_face_sync(image: np.ndarray, label: str, allow_multi: bool = False)
         det_score=float(best.det_score),
         accepted=True,
         blur_score=round(blur, 2),
-        face_size_px=size,
+        face_size_px=int(size),
     )
 
 
@@ -429,9 +448,21 @@ async def compare(
     # ── 5. Gate on ID image quality ───────────────────────────────────────────
     if not id_result.accepted:
         app_state.requests_failed += 1
+        reason = (
+            id_result.rejection_reason.value
+            if isinstance(id_result.rejection_reason, Enum)
+            else id_result.rejection_reason
+        )
         raise HTTPException(
             status_code=400,
-            detail=f"id_image rejected: {id_result.rejection_reason}",
+            detail=(
+                f"id_image rejected: {reason}"
+                + (
+                    f" (blur={id_result.blur_score}, min={Config.ID_BLUR_LAPLACIAN_THRESHOLD})"
+                    if id_result.blur_score is not None and reason == RejectionReason.BLURRY.value
+                    else ""
+                )
+            ),
         )
 
     # L2-normalise the ID embedding once
@@ -466,15 +497,19 @@ async def compare(
             "accepted":         r.accepted,
             "det_score":        round(r.det_score, 4) if r.accepted else None,
             "blur_score":       r.blur_score,
-            "face_size_px":     r.face_size_px,
-            "rejection_reason": r.rejection_reason,
+            "face_size_px":     int(r.face_size_px) if r.face_size_px is not None else None,
+            "rejection_reason": (
+                r.rejection_reason.value
+                if isinstance(r.rejection_reason, Enum)
+                else r.rejection_reason
+            ),
         }
         for i, r in enumerate(selfie_results)
     ]
 
     return {
         "match":       match,
-        "confidence":  confidence,
+        "confidence":  confidence.value,
         "similarity":  round(similarity, 4),
         "threshold":   Config.THRESHOLD,
         "explanation": _confidence_explanation(similarity, n_accepted, n_selfies),

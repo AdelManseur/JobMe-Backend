@@ -26,6 +26,6 @@ router.patch("/:adminId/permissions", protectAdminRoute, requireSuperAdmin, upda
 router.patch("/:adminId/status", protectAdminRoute, requireSuperAdmin, updateAdminStatus);
 
 // New endpoint
-router.get("/me", protectAdminRoute, GetMeAdmin)
+router.get("/me", protectAdminRoute, GetMeAdmin);
 
 export default router;

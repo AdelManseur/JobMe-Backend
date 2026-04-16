@@ -20,7 +20,6 @@ router.post("/flag", flagUserAsFraud);
 router.get("/check/:userId", checkUserFraudStatus);
 
 // Admin endpoints - require authentication and admin role
-// Uncomment the middleware when ready to add authentication
 router.get("/cases", protectAdminRoute, requirePermission("view_fraud_cases"), getFlaggedUsers);
 router.get("/cases/:id", protectAdminRoute, requirePermission("view_fraud_cases"), getFraudCaseDetails);
 router.put("/cases/:id/review", protectAdminRoute, requirePermission("review_fraud_cases"), reviewFraudCase);
