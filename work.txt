@@ -1,0 +1,47 @@
+I-SIGNIN , LOG IN/OUT , UPDATE USER PROFILE  // DONE
+
+chat app n//DONE
+EMAIL VERIFICATION WITH NODEMAILER //DONE
+face VERIFICATION
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
+curl.exe -X POST "http://localhost:3000/verify-id" -F "idImage=@C:/Users/kefif/Desktop/studies/pfe/id.jpg" -F "selfie=@C:/Users/kefif/Desktop/studies/pfe/selfie.jpg"
+
+II-ARTIFICIAL INTELLIGENCE USING GROQ
+    I-NON PAID FEATURES
+        moderation:
+        -Detect fake reviews / spam accounts using behavioral anomaly detection.
+
+        -AI-Assisted Customer Support
+        Chatbot for FAQs (payment, disputes, deadlines).
+        Context-aware support that escalates when needed.
+
+
+
+        for buyers:
+        -Semantic search / AI ranking: Instead of keyword matching (“logo design”), use embeddings to match intent. 
+        (e.g., user writes “I need a playful mascot logo” → model finds designers with a style close to that).
+        
+        -Recommendation engine: “You may also like” gigs/freelancers, based on buyer history or similarity of gigs.
+        -Let buyers describe their needs to a chatbot instead of filling forms. Bot turns it into a structured gig request.
+
+
+        for sellers:
+        -“Smart pricing” suggestions for freelancers based on historical data.
+        -Demand forecasting: show what skills are trending.
+     
+
+
+
+
+    II-PREMIUM FEATURES
+
+III-GIGS ORDERS REVIEWS 
+    
+        when a review is used (there should be a button to use the revision)
+           {
+            "gigId": "123",
+            "package": "Standard",
+            "includedRevisions": 2,
+            "extraRevisionPrice": 10
+        }
+IV

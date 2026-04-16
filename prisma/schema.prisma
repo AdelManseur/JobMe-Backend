@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_URI")
+}
+
+type UsersAddress {
+  city       String
+  country    String
+  postalCode String
+  street     String
+}
+
+model aimessages {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  v         Int      @map("__v")
+  content   String
+  createdAt DateTime @db.Date
+  from      String
+  to        String
+}
+
+model messages {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+}
+
+model otps {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  v         Int      @map("__v")
+  createdAt DateTime @db.Date
+  expires   Float
+  hash      String
+  updatedAt DateTime @db.Date
+}
+
+model users {
+  id               String       @id @default(auto()) @map("_id") @db.ObjectId
+  v                Int          @map("__v")
+  address          UsersAddress
+  bday             DateTime     @db.Date
+  createdAt        DateTime     @db.Date
+  email            String       @unique(map: "email_1")
+  /// Could not determine type: the field only had null or empty values in the sample set.
+  fieldsOfInterest Json?
+  lastOnline       DateTime     @db.Date
+  name             String
+  password         String
+  pfp              String
+  phone            String
+  status           Boolean
+  updatedAt        DateTime     @db.Date
+}
