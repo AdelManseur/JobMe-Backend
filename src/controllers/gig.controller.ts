@@ -77,8 +77,12 @@ export const getAllGigs = async (
       limit = 12
     } = req.query;
 
+    console.log("Received request to get all gigs with filters:", req.query);
+
     // Build filter object
     const filter: any = { isActive: true };
+
+    console.log("Initial filter:", filter);
 
     if (category) filter.category = category;
     if (subcategory) filter.subcategory = subcategory;
@@ -166,6 +170,7 @@ export const getGigsBySeller = async (
   res: Response,
   next: NextFunction
 ) => {
+  console.log("Received request to get gigs by seller with params:", req.params, "and query:", req.query);
   try {
     const { sellerId } = req.params;
     const { page = 1, limit = 10, status } = req.query;

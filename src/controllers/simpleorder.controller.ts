@@ -51,6 +51,7 @@ export const createSimpleOrder = async (
       expectedDelivery,
       requirements: requirements || [],
       status: 'pending',
+      reported: false,
       payment: {
         amount: gig.price,
         currency: 'USD',
@@ -58,8 +59,10 @@ export const createSimpleOrder = async (
       },
       timeline: {
         started: now
-      }
+      },
     });
+
+    console.log("[createSimpleOrder] New order object:", newOrder);
 
     const savedOrder = await newOrder.save();
     await savedOrder.populate([
@@ -551,9 +554,13 @@ export const addSimpleOrderMessage = async (
   next: NextFunction
 ) => {
   try {
+    console.log("[addSimpleOrderMessage] Request body:", req.body);
     // accept both keys for compatibility
     const simpleOrderId = req.body.simpleOrderId || req.body.orderId;
-    const { message, attachments } = req.body;
+    const { content, attachments } = req.body;
+    const message = content || req.body.message || req.body.content;
+    console.log("content:", content);
+    console.log("attachments:", attachments);
     const userId = req.user?._id;
 
     if (!mongoose.Types.ObjectId.isValid(simpleOrderId)) {
@@ -585,6 +592,8 @@ export const addSimpleOrderMessage = async (
       timestamp: new Date(),
     });
 
+    console.log("[addSimpleOrderMessage] Created message object:", simpleOrderMessage);
+
     const savedMessage = await simpleOrderMessage.save();
     await savedMessage.populate([
       { path: "from", select: "name pfp" },
@@ -606,37 +615,45 @@ export const getSimpleOrderMessages = async (
   next: NextFunction
 ) => {
   try {
+    console.log("[getSimpleOrderMessages] Query parameters:", req.query);
     const { me, orderId } = req.query;
 
     if (!me || !orderId) {
       return res.status(400).json({
-        error: "Missing required query parameters: me, other"
+        error: "Missing required query parameters: me, orderId"
       });
     }
 
-    const message = await SimpleOrderMessage.findOne({ orderId })
-    .sort({ createdAt: 1 });
+    // 1. Change .findOne to .find to get an array
+    const messages = await SimpleOrderMessage.find({ orderId })
+      .sort({ createdAt: 1 });
 
-    if(!message) {
-      return res.status(404).json({ message: "Message not found" });
+    // 2. Handle empty results (Optional: return 404 or just an empty array [])
+    if (!messages || messages.length === 0) {
+      return res.status(200).json({ messages: [] });
     }
 
-    // Add role field to indicate if the message is from the buyer or seller perspective
-    if(message.from.toString() == me.toString()) {
-      console.log("Message from me:", message);
-      message.role = "buyer";
-    } else if(message.to.toString() == me.toString()) {
-      console.log("Message to me:", message);
-      message.role = "seller";
-    } else {
-      console.log("Message not related to me:", message);
-      message.role = "unknown";
-    }
+    // 3. Map through the array to add the 'role' to each message
+    const processedMessages = messages.map((msg) => {
+      // Create a plain object if Mongoose documents are being used to allow property assignment
+      const messageObj = msg.toObject ? msg.toObject() : msg;
 
-    console.log("Final message with role:", message);
+      if (messageObj.from.toString() === me.toString()) {
+        messageObj.role = "buyer";
+      } else if (messageObj.to.toString() === me.toString()) {
+        messageObj.role = "seller";
+      } else {
+        messageObj.role = "unknown";
+      }
+      
+      return messageObj;
+    });
 
+    console.log(`Processed ${processedMessages.length} messages.`);
+
+    // 4. Return the array
     res.status(200).json({
-      message
+      messages: processedMessages
     });
 
   } catch (error) {

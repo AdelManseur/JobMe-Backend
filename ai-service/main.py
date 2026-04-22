@@ -19,7 +19,7 @@ import logging
 import subprocess
 import time
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Annotated
 
@@ -62,7 +62,7 @@ class Config:
     # IDs are often photos of printed cards with low texture, so they need a
     # lower blur gate than live selfies.
     ID_BLUR_LAPLACIAN_THRESHOLD: float = 25.0
-    SELFIE_BLUR_LAPLACIAN_THRESHOLD: float = 60.0
+    SELFIE_BLUR_LAPLACIAN_THRESHOLD: float = 10.0
 
     # Aggregation
     USE_WEIGHTED_AGGREGATION: bool = True
@@ -111,24 +111,30 @@ def _get_gpu_name() -> str:
         return "Unknown NVIDIA GPU"
 
 
+# main.py - Revised Lifespan
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global app_state
-    logger.info("Loading FaceAnalysis model …")
-    analyzer = FaceAnalysis(
-        providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
-    )
-    try:
-        analyzer.prepare(ctx_id=0, det_size=(640, 640))
-        device = f"GPU ({_get_gpu_name()})"
-    except Exception:
-        analyzer.prepare(ctx_id=-1, det_size=(640, 640))
-        device = "CPU"
+    print("Loading FaceAnalysis model...")
+    
+    # Use the absolute path to your .insightface folder
+    # Note: Use forward slashes / or double backslashes \\ in Python strings
+    root_path = r'C:\Users\Lenovo\.insightface\models'
+    
+    # Force the library to look at this specific directory
+    analyzer = FaceAnalysis(name='buffalo_sc', root=root_path)
+    
+    # If ctx_id=0 gives an error, try ctx_id=-1 to confirm CPU works first
+    analyzer.prepare(ctx_id=0, det_size=(640, 640))
 
-    app_state = AppState(face_analyzer=analyzer, device=device)
-    logger.info("Model ready on %s", device)
+    app_state = AppState(
+        face_analyzer=analyzer,
+        device=_get_gpu_name(),
+    )
+    logger.info("FaceAnalysis loaded on %s", app_state.device)
+    
     yield
-    logger.info("Shutdown complete.")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -184,6 +190,7 @@ def _decode_image(raw: bytes, label: str) -> np.ndarray:
     """Decode bytes → BGR ndarray; raises 400 on failure."""
     arr = np.frombuffer(raw, np.uint8)
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    print(f"{label}: decoded image shape {img.shape if img is not None else 'None'}")
     if img is None:
         raise HTTPException(status_code=400, detail=f"{label}: could not decode image")
     return img
@@ -321,6 +328,16 @@ def _aggregate_embeddings(
     """
     accepted = [r for r in results if r.accepted]
     if not accepted:
+        print("compare: no valid selfie frames; all selfies rejected by quality checks")
+        print("compare: selfie rejection reasons:")
+        for i, r in enumerate(results):
+            reason = (
+                r.rejection_reason.value
+                if isinstance(r.rejection_reason, Enum)
+                else r.rejection_reason
+            )
+            print(f"  selfie_{i+1}: {reason} (det_score={r.det_score:.4f}, blur={r.blur_score})")
+        logger.info("compare: no valid selfie frames; all selfies rejected by quality checks")
         raise HTTPException(
             status_code=400,
             detail="No valid selfie frames — all selfies were rejected by quality checks.",
@@ -338,6 +355,7 @@ def _aggregate_embeddings(
     # L2-normalise for stable cosine similarity
     norm = np.linalg.norm(agg)
     if norm == 0.0:
+        logger.warning("compare: aggregated selfie embedding is a zero vector")
         raise HTTPException(status_code=400, detail="Aggregated embedding is a zero vector.")
     return agg / norm
 
@@ -411,7 +429,8 @@ async def compare(
       • Depth map: if device provides IR/depth data, forward as extra field.
     """
     t0 = time.perf_counter()
-    assert app_state, "Model not initialised"
+    if not app_state:
+        raise HTTPException(status_code=503, detail="Model not loaded yet.")
     app_state.requests_total += 1
 
     # ── 1. Selfie count gate ──────────────────────────────────────────────────
@@ -447,12 +466,14 @@ async def compare(
 
     # ── 5. Gate on ID image quality ───────────────────────────────────────────
     if not id_result.accepted:
+        print(f"compare: ID image rejected (det_score={id_result.det_score:.4f}, blur={id_result.blur_score})")
         app_state.requests_failed += 1
         reason = (
             id_result.rejection_reason.value
             if isinstance(id_result.rejection_reason, Enum)
             else id_result.rejection_reason
         )
+        print(f"compare: ID image rejected due to {reason}.")
         raise HTTPException(
             status_code=400,
             detail=(
@@ -467,6 +488,9 @@ async def compare(
 
     # L2-normalise the ID embedding once
     id_norm = np.linalg.norm(id_result.embedding)
+    if id_norm == 0.0:
+        app_state.requests_failed += 1
+        raise HTTPException(status_code=400, detail="ID embedding is a zero vector.")
     id_emb  = id_result.embedding / id_norm
 
     # ── 6. Aggregate selfie embeddings ────────────────────────────────────────

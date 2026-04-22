@@ -3,6 +3,7 @@ import {
   submitReport,
   getAllReports,
   getReportDetails,
+  getReportDetailsByOrderId,
   reviewReport,
   getSellerReports,
   getMyReports,
@@ -40,6 +41,8 @@ router.get("/my-reports", protectRoute, getMyReports);
 
 // Public/Semi-public endpoints
 router.get("/seller/:sellerId", getSellerReports);
+// Added by Me
+router.get("/order/:id", getReportDetailsByOrderId);
 
 // Admin endpoints - require authentication and admin role
 router.get("/all", protectAdminRoute, requirePermission("view_reports"), getAllReports);

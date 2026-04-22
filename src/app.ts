@@ -45,7 +45,7 @@ app.use(cors({
     return callback(new Error("Origin not allowed by CORS"));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH']
 }));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'fallback-secret-key',

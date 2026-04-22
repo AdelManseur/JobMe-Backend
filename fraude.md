@@ -1560,6 +1560,77 @@ Get detailed information about a specific report.
 
 ---
 
+### 5.2 Get Report By OrderId
+
+**GET** `/api/reports/order/:id`
+
+Get detailed information about a specific report.
+
+#### Response (200 OK)
+```json
+{
+  "report": {
+    "_id": "507f1f77bcf86cd799439044",
+    "reporter": {
+      "_id": "507f1f77bcf86cd799439033",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "username": "johndoe",
+      "createdAt": "2025-08-15T00:00:00Z",
+      "verifiedEmail": true
+    },
+    "reportedUser": {
+      "_id": "507f1f77bcf86cd799439011",
+      "name": "Seller Name",
+      "email": "seller@example.com",
+      "username": "seller123",
+      "createdAt": "2025-10-01T00:00:00Z"
+    },
+    "order": {
+      "_id": "507f1f77bcf86cd799439022",
+      "buyer": "507f1f77bcf86cd799439033",
+      "seller": "507f1f77bcf86cd799439011",
+      "price": 150,
+      "status": "completed",
+      "deliveryTime": 3,
+      "createdAt": "2026-01-15T00:00:00Z"
+    },
+    "category": "non_delivery",
+    "severity": "high",
+    "description": "Seller marked order as complete but never delivered any files...",
+    "evidence": {
+      "screenshots": ["url1", "url2"],
+      "messages": ["msg_id_1", "msg_id_2"],
+      "additionalInfo": {
+        "orderCompletedDate": "2026-01-15T10:00:00Z"
+      }
+    },
+    "reporterCredibility": {
+      "fraudScore": 5,
+      "totalOrders": 15,
+      "accountAge": 120,
+      "verifiedAccount": true,
+      "credibilityScore": 95,
+      "priorReports": 2,
+      "priorReportsAccepted": 2
+    },
+    "status": "under_review",
+    "priority": "high",
+    "review": {
+      "decision": "pending",
+      "notes": ""
+    },
+    "impact": {
+      "similarReports": 2
+    },
+    "createdAt": "2026-01-21T10:00:00Z",
+    "updatedAt": "2026-01-21T10:00:00Z"
+  }
+}
+```
+
+---
+
 ### 6. Review Report (Admin)
 
 **PUT** `/api/reports/:id/review`

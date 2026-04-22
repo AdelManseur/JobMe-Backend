@@ -72,6 +72,7 @@ export const getAllSimpleGigs = async (
       minPrice,
       maxPrice,
       search,
+      tags,
       sortBy = 'createdAt',
       sortOrder = 'desc',
       page = 1,
@@ -82,6 +83,11 @@ export const getAllSimpleGigs = async (
     const filter: any = { isActive: true };
 
     if (category) filter.category = category;
+    // Rearrange tags filter to handle comma-separated string or array
+    if (tags) {
+      const tagsArray = Array.isArray(tags) ? tags : (tags as string).split(',').map(tag => tag.trim().toLowerCase());
+      filter.tags = { $in: tagsArray };
+    }
     if (search) {
       filter.$or = [
         { title: { $regex: search, $options: 'i' } },

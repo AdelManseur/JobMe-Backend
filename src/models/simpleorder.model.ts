@@ -10,6 +10,7 @@ export interface ISimpleOrder extends Document {
   deliveryTime: number; // in days
   revisions: number;
   status: 'pending' | 'active' | 'delivered' | 'completed' | 'cancelled' | 'in_revision';
+  reported: boolean; // virtual field to indicate if this order has been reported
   requirements: {
     question: string;
     answer: string;
@@ -86,6 +87,10 @@ const simpleOrderSchema = new Schema<ISimpleOrder>({
     type: String,
     enum: ['pending', 'active', 'delivered', 'completed', 'cancelled', 'in_revision'],
     default: 'pending'
+  },
+  reported: {
+    type: Boolean,
+    default: false
   },
   requirements: [{
     question: {

@@ -31,7 +31,7 @@ export const sendMessageAI = async (
       Your task is to help users find suitable gigs based on their skills and preferences.
       When a user sends you a message,
       analyze their request and respond with relevant gig tags.
-      available gig tags (select from these only): UX, Web, Development, Tailwind, CSS, Design, Video, UI, Figma, Logo, a.
+      available gig tags (select from these only): UX, Web, Development, Tailwind, CSS, Design, video, UI, Figma, Logo, data, data-analysis, animation.
       Don't respond in your way, but respond STRICTLY in this format:
       ["tag1", "tag2", "tag3", ...] (not necessarily 3 tags, but at least 1 tag if you find any relevant tag, otherwise respond with an empty array [])
       If this message is not a request for gig recommendations, respond appropriately based on the user's query.

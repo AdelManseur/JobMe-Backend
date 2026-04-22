@@ -10,6 +10,7 @@ export interface IOrder extends Document {
   deliveryTime: number; // in days
   revisions: number;
   status: 'pending' | 'active' | 'delivered' | 'completed' | 'cancelled' | 'in_revision';
+  reported?: boolean; // virtual field to indicate if this order has been reported
   requirements: {
     question: string;
     answer: string;

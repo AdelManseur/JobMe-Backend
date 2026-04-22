@@ -83,6 +83,21 @@ export const submitReport = async (req: Request, res: Response) => {
       evidence,
     } = reportData;
 
+    console.log("Received report submission:", {
+      reporterId,
+      reportedUserId,
+      orderId,
+      category,
+      severity,
+      descriptionLength: description?.length,
+      evidenceSummary: {
+        screenshots: evidence?.screenshots?.length || 0,
+        messages: evidence?.messages?.length || 0,
+        files: evidence?.files?.length || 0,
+        additionalInfoKeys: evidence ? Object.keys(evidence.additionalInfo || {}) : [],
+      },
+    });
+
     if (!reporterId) {
       return res.status(401).json({ error: "Authentication required" });
     }
@@ -270,6 +285,10 @@ export const submitReport = async (req: Request, res: Response) => {
       });
     }
 
+    // Add reported: true flag to order for quick access
+    order.reported = true;
+    const savedOrder = await order.save();
+
     res.status(201).json({
       message: "Report submitted successfully",
       report,
@@ -340,6 +359,29 @@ export const getReportDetails = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     const report = await Report.findById(id)
+      .populate("reporter", "name email username createdAt verifiedEmail")
+      .populate("reportedUser", "name email username createdAt")
+      .populate("order")
+      .populate("review.reviewedBy", "name email")
+      .populate("impact.fraudCaseCreated");
+
+    if (!report) {
+      return res.status(404).json({ error: "Report not found" });
+    }
+
+    res.json({ report });
+  } catch (error: any) {
+    console.error("Error fetching report details:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Get report by orderId
+export const getReportDetailsByOrderId = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const report = await Report.findOne({ order: id })
       .populate("reporter", "name email username createdAt verifiedEmail")
       .populate("reportedUser", "name email username createdAt")
       .populate("order")

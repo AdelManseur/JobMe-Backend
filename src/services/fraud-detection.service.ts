@@ -312,6 +312,7 @@ export async function analyzeSellerForFraud(
     similarReports: number;
   }
 ): Promise<any> {
+  console.log(`Analyzing seller ${sellerId} for fraud based on report ${reportData.reportId}`);
   try {
     const Report = (await import("../models/report.model")).default;
     
@@ -422,6 +423,7 @@ export async function analyzeSellerForFraud(
 
     // Only create fraud case if score is significant
     if (fraudScore < 50) {
+      console.log(`Seller ${sellerId} has a fraud score of ${fraudScore}, below threshold for flagging.`);
       return null;
     }
 

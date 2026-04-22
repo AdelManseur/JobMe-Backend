@@ -108,6 +108,7 @@ export const LogIn = async (
   next: NextFunction
 ) => {
   try {
+    console.log("Login request body:", req.body); // Debug log for incoming request
     const lastOnline: Date = new Date();
     const { email, password } = req.body;
 
@@ -130,10 +131,13 @@ export const LogIn = async (
     user.lastOnline = lastOnline;
     await user.save();
 
-    generateToken(user._id.toString(), res);
+    /*generateToken(user._id.toString(), res);*/
+    // Send Token in response body also for Mobile App
+    const token = generateToken(user._id.toString(), res);
 
     return res.status(200).json({
       message: "User logged in successfully",
+      token,
       user: {
         _id: user._id,
         name: user.name,

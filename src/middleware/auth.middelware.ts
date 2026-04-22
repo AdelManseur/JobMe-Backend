@@ -10,7 +10,8 @@ export const protectRoute = async (
   next: NextFunction
 ) => {
   try {
-    const token = req.cookies.jwt;
+    // Check the JWT from cookies or Authorization header to serve both web and mobile clients
+    const token = req.cookies.jwt || req.headers.authorization?.split(" ")[1];
     if (!token) {
       return res
         .status(401)

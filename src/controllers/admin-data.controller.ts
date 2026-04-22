@@ -191,14 +191,15 @@ export const getAllOrders = async (req: Request, res: Response) => {
 
     const skip = (Number(page) - 1) * Number(limit);
 
-    const orders = await Order.find(filter)
+    // Switching to SimpleOrder for now
+    const orders = await SimpleOrder.find(filter)
       .populate("buyer", "name email")
       .populate("seller", "name email")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
 
-    const total = await Order.countDocuments(filter);
+    const total = await SimpleOrder.countDocuments(filter);
 
     res.json({
       orders,
