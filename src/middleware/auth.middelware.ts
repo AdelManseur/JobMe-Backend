@@ -10,6 +10,7 @@ export const protectRoute = async (
   next: NextFunction
 ) => {
   try {
+    console.log("Checking authentication for request:");
     // Check the JWT from cookies or Authorization header to serve both web and mobile clients
     const token = req.cookies.jwt || req.headers.authorization?.split(" ")[1];
     if (!token) {

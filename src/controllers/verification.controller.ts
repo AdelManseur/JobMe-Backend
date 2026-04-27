@@ -10,7 +10,10 @@ export const verifyOTPAndCreateAccount = async (
   res: Response,
   next: NextFunction
 ) => {
+  console.log("Received OTP verification request");
   try {
+    console.log("Request body:", req.body);
+    console.log("Session data:", req.session);
     const { otp } = req.body;
 
     if (!otp) {
@@ -18,6 +21,7 @@ export const verifyOTPAndCreateAccount = async (
     }
 
     const pendingUserData = req.session.pendingUser;
+    console.log("Pending user data from session:", pendingUserData);
 
     if (!pendingUserData || !pendingUserData.email) {
       return res.status(400).json({ message: "Registration session expired" });

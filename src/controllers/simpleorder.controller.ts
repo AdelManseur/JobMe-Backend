@@ -4,6 +4,8 @@ import { SimpleGig } from "../models/simplegig.model";
 import mongoose from "mongoose";
 import { SimpleOrderMessage } from "../models/simpleordermessage.model";
 import { access } from "fs";
+import { detectSuspiciousPatterns, analyzeOrderForFraud } from "../services/fraud-detection.service";
+import { User } from "../models/user.model";
 
 // Create new simple order
 export const createSimpleOrder = async (
@@ -61,6 +63,71 @@ export const createSimpleOrder = async (
         started: now
       },
     });
+
+    // Getting all orders of the buyer to analyze patterns including the new pending order
+    const buyerOrders = await SimpleOrder.find({ buyer: buyerId })
+      .sort({ createdAt: 1 })
+      .select("price status createdAt")
+      .lean();
+
+    // Analyze for suspicious patterns with the new order included
+    const suspiciousPatterns = await detectSuspiciousPatterns(
+      buyerId.toString(),
+      [
+        ...buyerOrders,
+        {
+          price: gig.price,
+          status: "pending",
+          createdAt: now,
+        },
+      ]
+    );
+
+    if (suspiciousPatterns.length > 0) {
+      const cancelledOrders = buyerOrders.filter((o) => o.status === "cancelled").length;
+      const orderValues = [...buyerOrders.map((o) => Number(o.price) || 0), Number(gig.price) || 0];
+      const averageOrderValue =
+        orderValues.length > 0
+          ? orderValues.reduce((sum, value) => sum + value, 0) / orderValues.length
+          : 0;
+
+      const buyer = await User.findById(buyerId).select("createdAt").lean();
+      const accountAge = buyer?.createdAt
+        ? Math.floor((Date.now() - new Date(buyer.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+        : 0;
+
+      // 1. Fire-and-forget fraud analysis only when suspicious patterns are detected.
+      void analyzeOrderForFraud({
+        userId: buyerId.toString(),
+        buyerId: buyerId.toString(),
+        sellerId: gig.seller._id.toString(),
+        price: Number(gig.price) || 0,
+        buyerHistory: {
+          totalOrders: buyerOrders.length + 1,
+          cancelledOrders,
+          averageOrderValue,
+          accountAge,
+        },
+        orderDetails: {
+          requirements: requirements || [],
+          deliveryTime: Number(gig.deliveryTime) || 1,
+          unusualPatterns: suspiciousPatterns,
+        },
+        triggeringEvent: {
+          type: "simple_order_blocked_by_pattern",
+          gigId: gigId.toString(),
+          timestamp: new Date(),
+        },
+      }).catch((analysisError) => {
+        console.error("[createSimpleOrder] analyzeOrderForFraud failed:", analysisError);
+      });
+
+      // 2. return suspicious patterns in response without creating the order
+      return res.status(200).json({
+        message: "Suspicious patterns detected",
+        suspiciousPatterns,
+      });
+    }
 
     console.log("[createSimpleOrder] New order object:", newOrder);
 

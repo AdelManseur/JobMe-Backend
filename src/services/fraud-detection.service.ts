@@ -42,6 +42,7 @@ export async function analyzeOrderForFraud(orderData: {
   };
   triggeringEvent?: any;
 }): Promise<FraudAnalysisResult> {
+  console.log("Analyzing order for fraud with data:", orderData);
   const prompt = `You are a fraud detection AI analyzing an e-commerce order. Analyze the following order data and determine if it's potentially fraudulent:
 
 Order Details:
@@ -92,7 +93,7 @@ Return ONLY a JSON response in this exact format (no markdown, no extra text):
 
   try {
     const completion = await groq.chat.completions.create({
-      model: "meta-llama/llama-4-maverick-17b-128e-instruct",
+      model: "llama-3.3-70b-versatile",
       messages: [
         {
           role: "system",
@@ -113,8 +114,11 @@ Return ONLY a JSON response in this exact format (no markdown, no extra text):
     const parsedResponse = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
 
     if (!parsedResponse) {
+      console.error("Failed to parse AI response as JSON:", response);
       throw new Error("Invalid AI response format");
     }
+
+    console.log("AI Fraud Analysis Result:", parsedResponse);
 
     const result: FraudAnalysisResult = {
       isFraudulent: parsedResponse.isFraudulent || false,
@@ -127,7 +131,11 @@ Return ONLY a JSON response in this exact format (no markdown, no extra text):
 
     // Auto-flag user if risk score is high
     if (result.riskScore >= 70) {
-      await autoFlagUser(orderData.userId, result, orderData.triggeringEvent);
+      await autoFlagUser(orderData.userId, result, {
+        type: "other", // Change the type to "other" to satisfy the DB
+        details: "Order blocked by suspicious patterns", 
+        timestamp: new Date()
+      });
     }
 
     return result;

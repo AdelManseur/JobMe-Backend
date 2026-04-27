@@ -1,15 +1,18 @@
 import { Request, Response, NextFunction, response } from "express";
-import {  User } from "../models/user.model";
+import { User } from "../models/user.model";
+import { Admin } from "../models/admin.model";
 import bcrypt from "bcrypt";
 import { generateToken } from "../lib/utils";
 import cloudinary from "../lib/cloudinary";
 import { userimg } from "../models/user.model";
 import { sendOTP } from "../lib/otp";
+
 export const SignIn = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
+  console.log("SignIn called with metadata:", req.body.metadata);
   try {
     const metadata =
       typeof req.body.metadata === "string" ? JSON.parse(req.body.metadata) : req.body;
@@ -86,12 +89,17 @@ export const SignIn = async (
     };
 
     req.session.pendingUser = pendingUserData;
+    console.log("Pending user data stored in session:", req.session.pendingUser); // Debug log for session storage
 
     await sendOTP(email);
 
     // Ensure session is persisted before response
     req.session.save((err) => {
-      if (err) return next(err);
+      console.log("Session save callback called"); // Debug log for session save callback
+      if (err) {
+        console.error("Session save error:", err);
+        return next(err);
+      } 
       return res.status(200).json({
         message: "OTP sent successfully",
         redirect: "/verify-otp",
@@ -107,6 +115,7 @@ export const LogIn = async (
   res: Response,
   next: NextFunction
 ) => {
+  console.log("LogIn called with metadata:", req.body.metadata);
   try {
     console.log("Login request body:", req.body); // Debug log for incoming request
     const lastOnline: Date = new Date();
@@ -134,6 +143,7 @@ export const LogIn = async (
     /*generateToken(user._id.toString(), res);*/
     // Send Token in response body also for Mobile App
     const token = generateToken(user._id.toString(), res);
+    console.log("User logged in successfully, token generated"); // Debug log for successful login
 
     return res.status(200).json({
       message: "User logged in successfully",
@@ -154,6 +164,7 @@ export const LogIn = async (
 };
 
 export const GetMe = async (req: any, res: any) => {
+  console.log("GetMe called, req.user:", req.user); // Debug log to check if req.user is set
   // req.user should be set by protectRoute
   return res.status(200).json({
     logged: true,
@@ -305,9 +316,20 @@ export const GetDetails = async (req: any, res: any) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const user = await User.findById(userId).select("-password");
+    const user = await User.findById(userId).select("-password") || await Admin.findById(userId).select("-password");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.role === "admin" || user.role === "super_admin") {
+      return res.status(200).json({
+        user: {
+          name: user.name,
+          email: user.email,
+          pfp: user.pfp,
+          role: user.role,
+        },
+      });
     }
 
     return res.status(200).json({

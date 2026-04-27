@@ -196,6 +196,8 @@ Cookie: jwt=<token>
 }
 ```
 
+---
+
 ## Chat APIs
 
 ### 1. Send Message

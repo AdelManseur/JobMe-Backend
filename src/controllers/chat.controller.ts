@@ -123,6 +123,7 @@ export const messageRead = async (req: Request, res: Response, next: NextFunctio
 
 export const setConv = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    console.log("Received setConv request with body:", req.body);
     const { user1Id, user2Id } = req.body;
 
     if (!user1Id || !user2Id) {
@@ -164,6 +165,7 @@ export const setConv = async (req: Request, res: Response, next: NextFunction) =
 
 export const getConv = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    console.log("Received getConv request with query:", req.query);
     const { userId } = req.query;
 
     if (!userId) {
@@ -178,6 +180,8 @@ export const getConv = async (req: Request, res: Response, next: NextFunction) =
         { user2Id: userId }
       ]
     }).sort({ createdAt: 1 });
+
+    console.log(`Found ${conversations.length} conversations for userId=${userId}`);
 
     return res.status(200).json({
       conversations
